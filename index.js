@@ -129,6 +129,12 @@ module.exports = function(app) {
   plugin.stop =  function() {
   };
 
+  plugin.registerWithRouter = function(router) {
+    router.get("/getReadings", (req, res) => {
+      res.send(JSON.stringify(pressureReadings));
+    });
+  }
+
   plugin.schema = {
     type: 'object',
     required: ['source'],
