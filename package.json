@@ -1,6 +1,6 @@
 {
   "name": "signalk-barometer",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Barometer",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,10 @@
     "signalk-node-server-plugin",
     "signalk-webapp"
   ],
-  "signalk": {},
+  "signalk": {
+    "appIcon": "barometer.png",
+    "displayName": "Barometer"
+  },
   "author": "Ilker Temir",
   "license": "Apache-2.0",
   "dependencies": {

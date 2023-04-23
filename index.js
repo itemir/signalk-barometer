@@ -23,7 +23,13 @@ module.exports = function(app) {
   plugin.name = "Barometer";
   plugin.description = "A simple barometer with notifications";
   var unsubscribes = [];
+  var publishReadingsProcess;
+  var publishNotificationsProcess;
   var pressureReadings;
+  var metasPublished = false;
+  var pressureNow;
+  var pressureTwelveHoursAgo;
+  var pressureOneDayAgo;
 
   plugin.start = function(options) {
     const dataFile = filePath.join(app.getDataDirPath(), 'readings.json');
@@ -76,32 +82,140 @@ module.exports = function(app) {
       }
     }
 
+    function publishNotifications() {
+      if (options.publishNotifications == false) {
+        app.debug('Notification publishing disabled');
+        return;
+      }
+
+      if (pressureReadings.length == 0) {
+        return;
+      }
+
+      let lastReading = pressureReadings[pressureReadings.length -1];
+      let lastPressure = lastReading.value;
+      let values = [];
+      if (pressureTwelveHoursAgo) {
+        let delta = Math.round((lastPressure - pressureTwelveHoursAgo)/100);
+        if (delta >= 12) {
+          values.push ({
+            path: `notifications.environment.${options.source}.pressure.twelveHours`,
+            value: {
+              state: 'alert',
+              method: ['visual'],
+              message: `Significant (${delta} hPa) pressure drop in the last 12 hours`
+            }
+          });
+        }
+      }
+      if (pressureOneDayAgo) {
+        let delta = Math.round((lastPressure - pressureOneDayAgo)/100);
+        if (delta >= 24) {
+          values.push ({
+            path: `notifications.environment.${options.source}.pressure.oneDay`,
+            value: {
+              state: 'alert',
+              method: ['visual'],
+              message: `Significant (${delta} hPa) pressure drop in the last 24 hours`
+            }
+          });
+        }
+      }
+
+      if (values.length > 0) {
+        app.debug(`Publishing alarm (${JSON.stringify(values)})`);
+        app.handleMessage(plugin.id, {
+          updates: [{
+            values: values
+          }]
+        });
+      }
+    }
+
     function publishReadings() {
       let oneHourAgo = findReadingAgo(1);
+      let twelveHoursAgo = findReadingAgo(12);
       let oneDayAgo = findReadingAgo(24);
       let twoDaysAgo = findReadingAgo(48);
       app.debug(`Publishing barometer reading for one hour, day and two days ago (${oneHourAgo}, ${oneDayAgo}, ${twoDaysAgo}`);
+
+      // Set global variables for notifications
+      pressureTwelveHoursAgo = twelveHoursAgo;
+      pressureOneDayAgo = oneDayAgo;
  
+      var metas = [];
       var values = [];
       if (oneHourAgo) {
         values.push ({
-          path: `environment.${options.source}.pressureReadings.oneHourAgo`,
+          path: `environment.${options.source}.pressure.oneHourAgo`,
           value: oneHourAgo
         }); 
+        if (!metasPublished) {
+          metas.push ({
+            path: `environment.${options.source}.pressure.oneHourAgo`,
+            value: {
+              units: 'Pa',
+              description: 'Pressure one hour ago'
+            }
+          });
+        }
       }
+      if (twelveHoursAgo) {
+        values.push ({
+          path: `environment.${options.source}.pressure.twelveHoursAgo`,
+          value: twelveHoursAgo
+        });
+        if (!metasPublished) {
+          metas.push ({
+            path: `environment.${options.source}.pressure.twelveHoursAgo`,
+            value: {
+              units: 'Pa',
+              description: 'Pressure twelve hours ago'
+            }
+          });
+        }
+       }
       if (oneDayAgo) {
         values.push({ 
-          path: `environment.${options.source}.pressureReadings.oneDayAgo`,
+          path: `environment.${options.source}.pressure.oneDayAgo`,
           value: oneDayAgo,
         });
-      }
+        if (!metasPublished) {
+          metas.push ({
+            path: `environment.${options.source}.pressure.oneDayAgo`,
+            value: {
+              units: 'Pa',
+              description: 'Pressure one day (24 hours) ago'
+            }
+          });
+        }
+       }
       if (twoDaysAgo) {
         values.push({
-          path: `environment.${options.source}.pressureReadings.twoDaysAgo`,
+          path: `environment.${options.source}.pressure.twoDaysAgo`,
           value: twoDaysAgo
         });
+        if (!metasPublished) {
+          metas.push ({
+            path: `environment.${options.source}.pressure.twoDaysAgo`,
+            value: {
+              units: 'Pa',
+              description: 'Pressure two days (48 hours) ago'
+            }
+          });
+        }
+       }
+
+      // Publish metas only once
+      if (!metasPublished) {
+        metasPublished = true;
+        app.handleMessage(plugin.id, {
+          updates: [{ 
+            meta: metas
+          }]
+        });
       }
-      app.handleMessage('barometer', {
+      app.handleMessage(plugin.id, {
         updates: [{
           values: values
         }]
@@ -120,13 +234,20 @@ module.exports = function(app) {
       app.error('Subscription error');
     }, data => processDelta(data));
  
-    // Publish every 2 seconds
-    setInterval( function() {
+    // Publish deltas every 2 seconds
+    publishReadingsProcess = setInterval( function() {
       publishReadings();
     }, 2000);
+
+     // Check and publish notifications every every 30 minutes
+    publishNotificationsProcess = setInterval( function() {
+      publishNotifications();
+    }, 30*60*1000);
   }
 
   plugin.stop =  function() {
+    clearInterval(publishReadingsProcess);
+    clearInterval(publishNotificationsProcess);
   };
 
   plugin.registerWithRouter = function(router) {
@@ -137,12 +258,17 @@ module.exports = function(app) {
 
   plugin.schema = {
     type: 'object',
-    required: ['source'],
+    required: ['source', 'publishNotifications'],
     properties: {
       source: {
         type: 'string',
         title: 'Pressure Source',
-        'default': 'outside'
+        default: 'outside'
+      },
+      publishNotifications: {
+        type: 'boolean',
+        title: 'Publish notifications when atmospheric pressure drops at least one hPa over 12 and 24 hours',
+        default: true
       }
     }
   }
