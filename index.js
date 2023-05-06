@@ -134,10 +134,15 @@ module.exports = function(app) {
 
     function publishReadings() {
       let oneHourAgo = findReadingAgo(1);
+      let threeHoursAgo = findReadingAgo(3);
       let twelveHoursAgo = findReadingAgo(12);
       let oneDayAgo = findReadingAgo(24);
       let twoDaysAgo = findReadingAgo(48);
-      app.debug(`Publishing barometer reading for one hour, day and two days ago (${oneHourAgo}, ${oneDayAgo}, ${twoDaysAgo}`);
+      let lastReading = pressureReadings[pressureReadings.length -1];
+      let lastPressure = lastReading.value;
+
+      app.debug(`Publishing barometer reading for one hour, three hours, one day and two days ago ` +
+                `(${oneHourAgo}, ${threeHoursAgo}, ${oneDayAgo}, ${twoDaysAgo}`);
 
       // Set global variables for notifications
       pressureTwelveHoursAgo = twelveHoursAgo;
@@ -150,61 +155,131 @@ module.exports = function(app) {
           path: `environment.${options.source}.pressure.oneHourAgo`,
           value: oneHourAgo
         }); 
-        if (!metasPublished) {
-          metas.push ({
-            path: `environment.${options.source}.pressure.oneHourAgo`,
-            value: {
-              units: 'Pa',
-              description: 'Pressure one hour ago'
-            }
-          });
-        }
+        metas.push ({
+          path: `environment.${options.source}.pressure.oneHourAgo`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure one hour ago'
+          }
+        });
+
+        let oneHourDelta = lastPressure - oneHourAgo;
+        values.push ({
+          path: `environment.${options.source}.pressure.oneHourDelta`,
+          value: oneHourDelta
+        }); 
+        metas.push ({
+          path: `environment.${options.source}.pressure.oneHourDelta`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure change in the last hour'
+          }
+        });
+      }
+      if (threeHoursAgo) {
+        values.push ({
+          path: `environment.${options.source}.pressure.threeHoursAgo`,
+          value: threeHoursAgo
+        });
+        metas.push ({
+          path: `environment.${options.source}.pressure.threeHoursAgo`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure three hours ago'
+          }
+        });
+
+        let threeHoursDelta = lastPressure - threeHoursAgo;
+        values.push ({
+          path: `environment.${options.source}.pressure.threeHoursDelta`,
+          value: threeHoursDelta
+        }); 
+        metas.push ({
+          path: `environment.${options.source}.pressure.threeHoursDelta`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure change in the last three hours'
+          }
+        });
       }
       if (twelveHoursAgo) {
         values.push ({
           path: `environment.${options.source}.pressure.twelveHoursAgo`,
           value: twelveHoursAgo
         });
-        if (!metasPublished) {
-          metas.push ({
-            path: `environment.${options.source}.pressure.twelveHoursAgo`,
-            value: {
-              units: 'Pa',
-              description: 'Pressure twelve hours ago'
-            }
-          });
-        }
-       }
+        metas.push ({
+          path: `environment.${options.source}.pressure.twelveHoursAgo`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure twelve hours ago'
+          }
+        });
+
+        let twelveHoursDelta = lastPressure - twelveHoursAgo;
+        values.push ({
+          path: `environment.${options.source}.pressure.twelveHoursDelta`,
+          value: twelveHoursDelta
+        }); 
+        metas.push ({
+          path: `environment.${options.source}.pressure.twelveHoursDelta`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure change in the last twelve hours'
+          }
+        });
+      }
       if (oneDayAgo) {
         values.push({ 
           path: `environment.${options.source}.pressure.oneDayAgo`,
           value: oneDayAgo,
         });
-        if (!metasPublished) {
-          metas.push ({
-            path: `environment.${options.source}.pressure.oneDayAgo`,
-            value: {
-              units: 'Pa',
-              description: 'Pressure one day (24 hours) ago'
-            }
-          });
-        }
-       }
+        metas.push ({
+          path: `environment.${options.source}.pressure.oneDayAgo`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure one day (24 hours) ago'
+          }
+        });
+
+        let oneDayDelta = lastPressure - oneDayAgo;
+        values.push ({
+          path: `environment.${options.source}.pressure.oneDayDelta`,
+          value: oneDayDelta
+        }); 
+        metas.push ({
+          path: `environment.${options.source}.pressure.oneDayDelta`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure change in the last day'
+          }
+        });
+      }
       if (twoDaysAgo) {
         values.push({
           path: `environment.${options.source}.pressure.twoDaysAgo`,
           value: twoDaysAgo
         });
-        if (!metasPublished) {
-          metas.push ({
-            path: `environment.${options.source}.pressure.twoDaysAgo`,
-            value: {
-              units: 'Pa',
-              description: 'Pressure two days (48 hours) ago'
-            }
-          });
-        }
-       }
+        metas.push ({
+          path: `environment.${options.source}.pressure.twoDaysAgo`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure two days (48 hours) ago'
+          }
+        });
+
+        let twoDaysDelta = lastPressure - twoDaysAgo;
+        values.push ({
+          path: `environment.${options.source}.pressure.twoDaysDelta`,
+          value: twoDaysDelta
+        }); 
+        metas.push ({
+          path: `environment.${options.source}.pressure.twoDaysDelta`,
+          value: {
+            units: 'Pa',
+            description: 'Pressure change in the last two days'
+          }
+        });
+      }
 
       // Publish metas only once
       if (!metasPublished) {
